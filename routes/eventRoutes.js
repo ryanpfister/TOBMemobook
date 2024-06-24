@@ -2,38 +2,30 @@
 
 const express = require('express');
 const router = express.Router();
-const isAuthenticated = require('../middlewares/authMiddleware');
-const validate = require('../middlewares/validationMiddleware');
-const { body } = require('express-validator');
+const { db } = require('../firebaseAdmin'); // Adjust the path as per your folder structure
+const firebaseAuth = require('../middlewares/firebaseAuthMiddleware'); // Firebase Authentication middleware
 
-// Example Event Model
-const Event = require('../models/Event');
+// Firebase Firestore instance
+const eventsCollection = db.collection('events');
 
-// Route to create a new event
-router.post('/create', isAuthenticated, [
-  body('eventType').notEmpty().isString(),
-  body('timestamp').notEmpty().isISO8601(),
-  body('location').notEmpty().isString(),
-  body('ccNumber').notEmpty().isString(),
-  validate,
-], (req, res) => {
+// Route to create a new event (protected by Firebase Authentication)
+router.post('/create', firebaseAuth, async (req, res) => {
   const { eventType, timestamp, location, ccNumber } = req.body;
 
-  const newEvent = new Event({
-    eventType,
-    timestamp,
-    location,
-    ccNumber,
-  });
-
-  newEvent.save()
-    .then(() => {
-      res.status(201).send('Event created successfully');
-    })
-    .catch(err => {
-      console.error(err);
-      res.status(500).send('Error creating event');
+  try {
+    const newEvent = await eventsCollection.add({
+      eventType,
+      timestamp,
+      location,
+      ccNumber,
+      createdBy: req.user.uid, // Example: Store user ID who created the event
     });
+
+    res.status(201).send('Event created successfully');
+  } catch (error) {
+    console.error('Error creating event:', error);
+    res.status(500).send('Error creating event');
+  }
 });
 
 module.exports = router;
